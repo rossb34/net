@@ -7,8 +7,36 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cstring>
+#include <exception>
+#include <string>
 
 namespace net {
+
+    /// IOError Exception
+    class IOError : public std::exception {
+    public:
+        /// IOError constructor with error code and message
+        ///
+        /// \param code error code of the exception
+        /// \param msg string describing the meaning of the error
+        IOError(int code, const std::string &msg) : code_(code), msg_(msg) {}
+
+        [[nodiscard]] const char *what() const noexcept override {
+            return msg_.c_str();
+        }
+
+        /// Gets the error code of the exception
+        ///
+        /// \return returns the error code of the exception. In general, this is the value of errno.
+        [[nodiscard]] int code() const noexcept {
+            return code_;
+        }
+
+    private:
+        int code_;
+        std::string msg_;
+    };
 
     /// Stream Socket Class
     ///
@@ -112,6 +140,52 @@ namespace net {
         /// \return returns `true` if the socket is blocking, `false` if the socket is non-blocking.
         [[nodiscard]] bool getBlocking() const {
             return blocking_;
+        }
+
+        /// Receives data from the socket file descriptor
+        ///
+        /// \param buffer buffer to receive len bytes of data.
+        /// \param len maximum number of bytes to read (i.e. length of buffer).
+        /// \return the number of bytes read. On error, will throw an IOError exception with code set to errno and what
+        /// set to the string description of the error.
+        ssize_t recvBytes(char *buffer, size_t len) const {
+            const auto rv = recv(fd_, buffer, len, 0);
+            if (rv == -1) {
+                // errno is set to EAGAIN if there was nothing to receive on the socket or recv would block.
+                // EAGAIN means resource temporarily unavailable and can be the same value as EWOULDBLOCK.
+                // Any other error number is treated as a socket connection problem or socket read failure.
+
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    return 0;
+                } else {
+                    throw IOError(errno, strerror(errno));
+                }
+            }
+
+            return rv;
+        }
+
+        /// Sends data to the socket file descriptor
+        ///
+        /// \param buffer buffer of data to send.
+        /// \param len number of bytes to send.
+        /// \return returns the number of bytes sent. On error, will throw an IOError exception with code set to errno
+        /// and what set to the string description of the error.
+        ssize_t sendBytes(const char *buffer, size_t len) const {
+            const auto rv = send(fd_, buffer, len, 0);
+            if (rv == -1) {
+                // errno is set to EAGAIN if the send would block.
+                // EAGAIN means resource temporarily unavailable and can be the same value as EWOULDBLOCK.
+                // Any other error number is treated as a connection problem or send failure.
+
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    return 0;
+                } else {
+                    throw IOError(errno, strerror(errno));
+                }
+            }
+
+            return rv;
         }
 
     private:
