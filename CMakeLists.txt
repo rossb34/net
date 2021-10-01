@@ -9,7 +9,8 @@ include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 set(header_files
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/net/socket.hpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/net/socket.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/net/address_resolver.hpp)
 
 add_library(${LIB_NAME} INTERFACE)
 target_sources(${LIB_NAME} INTERFACE "$<BUILD_INTERFACE:${header_files}>")
